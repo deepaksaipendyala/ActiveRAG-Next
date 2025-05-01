@@ -68,8 +68,8 @@ def test_active_rag_validation_loop():
 # --- Execute tests selectively ---
 if __name__ == "__main__":
     # Choose which tests to run
-    # test_active_rag_simple_query()
-    # print("\n" + "="*80 + "\n")
+    test_active_rag_simple_query()
+    print("\n" + "="*80 + "\n")
     # test_active_rag_reasoning_query()
     # print("\n" + "="*80 + "\n")
-    test_active_rag_validation_loop()
+    # test_active_rag_validation_loop()

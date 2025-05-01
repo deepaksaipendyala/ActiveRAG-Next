@@ -1,20 +1,45 @@
-import streamlit as st
-import sys
 import os
 os.environ["TORCH_DISABLE_STREAMLIT_WATCH"] = "1"
+
+import streamlit as st
+import sys
+import re
+# Refined watch dirs/exclude if needed based on your exact project structure
+os.environ["STREAMLIT_WATCH_DIRS"] = "app,graph,loaders,prompts,retrievers,feedback,utils"
+# os.environ["STREAMLIT_WATCH_EXCLUDE_PATTERNS"] = r"\/torch\/|\/.venv\/" # Example broader exclude
 import asyncio
+import time
 import logging
-import json # For potentially displaying structured data nicely
+from pydantic import BaseModel
+import json
+from typing import Dict, List
 
 # Add project root to sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
-# Import graph runner and state (ensure backend is ready)
-# We might need a modified runner that accepts config
-from graph.builder import run_active_rag # Assuming run_rag handles state init
-from graph.state import GraphState # Import the state model
-from langchain_core.messages import HumanMessage, AIMessage
 
+from graph.builder import run_active_rag, get_graphviz_dot, stream_active_rag
+from graph.state import GraphState, Relation # Import the state model
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+
+# --- Serialization Helper ---
+def to_serializable(obj):
+    if isinstance(obj, BaseModel):
+        return obj.model_dump(mode='json') # Use mode='json' for better serialization
+    if isinstance(obj, dict):
+        return {k: to_serializable(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [to_serializable(i) for i in obj]
+    # Handle other non-serializable types if necessary
+    try:
+        json.dumps(obj) # Test if serializable
+        return obj
+    except TypeError:
+        return str(obj) # Convert problematic types to string as fallback
+
+# --- Chat History Conversion ---
 def convert_chat_to_base_messages(chat_list):
     messages = []
     for m in chat_list:
@@ -22,132 +47,242 @@ def convert_chat_to_base_messages(chat_list):
             messages.append(HumanMessage(content=m["content"]))
         elif m["role"] == "assistant":
             messages.append(AIMessage(content=m["content"]))
-        # If you later add system messages etc., handle them here
+        elif m["role"] == "system":
+            messages.append(SystemMessage(content=m.get("content", "")))
     return messages
 
-# Setup basic logging for the app
+# --- Logging Setup ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - UI - [%(levelname)s] - %(message)s')
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__) # Use __name__ for logger
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="ActiveRAG Next 🚀",
+    page_title="ActiveRAG Next",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # --- Helper Functions ---
-def display_state_details(state: GraphState):
+def display_state_details(state: GraphState | None): # Allow None state
     """Helper to display various details from the final state in tabs."""
     if not state:
-        st.warning("Graph execution did not return a final state.")
+        st.warning("Graph execution did not yield a final state.")
+        return
+    if not isinstance(state, GraphState):
+        st.error(f"Invalid state type received: {type(state)}. Cannot display details.")
+        logger.error(f"Display function received invalid state type: {type(state)}")
         return
 
     # Use tabs for better organization
     tab_answer, tab_reasoning, tab_context, tab_analysis, tab_interactive, tab_flow = st.tabs([
-        "✅ Final Answer",
-        "🧠 Reasoning",
-        "📚 Context",
-        "📊 Analysis",
-        "💬 Interaction",
-        "⚡ Execution Flow"
+        "Final Answer",
+        "Reasoning",
+        "Context",
+        "Analysis",
+        "Interaction",
+        "Execution Flow"
     ])
 
     # --- Tab 1: Final Answer ---
     with tab_answer:
         st.subheader("Final Answer")
-        if state.answer:
-            st.markdown(state.answer) # Display the final formatted answer
+        # Use getattr for safety, although state should conform to GraphState
+        final_answer = getattr(state, 'answer', None)
+        if final_answer:
+            st.markdown(final_answer) # Display the final formatted answer
         else:
-            st.warning("No final answer was generated.")
+            st.warning("No final answer was generated in the state.")
+            # Optionally display validation feedback if answer is missing but validation failed
+            if not getattr(state, 'is_valid', True) and getattr(state, 'validation_feedback', None):
+                 st.info(f"Validation Feedback: {state.validation_feedback}")
 
         st.divider()
         col1, col2 = st.columns(2)
         with col1:
-            st.metric(label="Validation Status", value=("✅ Valid" if state.is_valid else "⚠️ Invalid") if state.is_valid is not None else "N/A")
+            is_valid = getattr(state, 'is_valid', None)
+            validation_text = "N/A"
+            if is_valid is True:
+                validation_text = "✅ Valid"
+            elif is_valid is False:
+                validation_text = "⚠️ Invalid"
+            st.metric(label="Validation Status", value=validation_text)
         with col2:
-            st.metric(label="Confidence Score", value=f"{state.confidence_score:.2f}" if state.confidence_score is not None else "N/A")
+            score = getattr(state, 'confidence_score', None)
+            st.metric(label="Confidence Score", value=f"{score:.2f}" if score is not None else "N/A")
 
-        if state.validation_feedback and not state.is_valid:
+        val_feedback = getattr(state, 'validation_feedback', None)
+        if val_feedback and is_valid is False:
              with st.expander("Show Validation Feedback"):
-                  st.warning(state.validation_feedback)
+                  st.warning(val_feedback)
 
     # --- Tab 2: Reasoning ---
     with tab_reasoning:
-        st.subheader("Reasoner Output")
-        if state.generation:
-            st.text_area("Raw Generation Output", state.generation, height=200)
+        st.subheader("Reasoner Output (Final Generation)")
+        generation = getattr(state, 'generation', None)
+        if generation:
+            # Use markdown in case the generation includes formatting
+            st.markdown("```\n" + generation + "\n```")
+            # st.text_area("Raw Generation Output", generation, height=200) # Alternative display
         else:
-            st.info("No raw generation output available.")
+            st.info("No raw generation output available in the final state.")
 
-        st.subheader("Reasoning Steps (GoT Trace)")
-        if state.reasoning_steps:
-            st.markdown("```\n" + "\n".join(f"Step {i+1}: {step}" for i, step in enumerate(state.reasoning_steps)) + "\n```")
+        st.subheader("Reasoning Steps (Trace)")
+        steps = getattr(state, 'reasoning_steps', [])
+        if steps:
+            # Using markdown with code block for better readability
+            st.markdown("```markdown\n" + "\n".join(f"Step {i+1}: {step}" for i, step in enumerate(steps)) + "\n```")
         else:
-            st.info("No detailed reasoning steps available.")
+            st.info("No detailed reasoning steps available in the final state.")
 
         st.subheader("Final Context Used for Reasoning (Trace)")
-        if state.reasoning_trace:
-            st.text_area("Context Trace", state.reasoning_trace, height=300)
+        trace = getattr(state, 'reasoning_trace', None)
+        if trace:
+            # Use markdown in case trace includes formatting, wrap in code block
+             st.markdown("```\n" + trace + "\n```")
+            # st.text_area("Context Trace", trace, height=300) # Alternative
         else:
-            st.info("No reasoning context trace available.")
+            st.info("No reasoning context trace available in the final state.")
 
     # --- Tab 3: Context ---
     with tab_context:
         st.subheader("Retrieved Content")
-        if state.retrieved_contents:
-            st.info(f"{len(state.retrieved_contents)} passages retrieved.")
+        contents = getattr(state, 'retrieved_contents', [])
+        if contents:
+            st.info(f"{len(contents)} passages retrieved (showing top passages used/available).")
+            # Decide whether to show all or just top ones used in reasoning_trace if available
             with st.expander("View All Retrieved Passages", expanded=False):
-                for idx, passage in enumerate(state.retrieved_contents):
+                for idx, passage in enumerate(contents):
                     st.markdown(f"**Passage {idx+1}:**")
-                    st.text_area(f"passage_{idx+1}", passage, height=150, label_visibility="collapsed")
+                    # Use st.markdown or st.text_area based on expected content length/type
+                    st.markdown(f"```text\n{passage}\n```")
+                    # st.text_area(f"passage_{idx+1}", passage, height=150, label_visibility="collapsed", key=f"ctx_{idx}")
                     st.markdown("---")
         else:
-            st.warning("No content was retrieved.")
-        # Add display for input URLs if implemented
-        # if state.input_urls:
-        #    st.subheader("User Provided URLs")
-        #    st.write(state.input_urls)
+            st.warning("No content was retrieved or retained in the final state.")
+        # Add display for input URLs if implemented and stored in state
+        input_urls = getattr(state, 'input_urls', []) # Assuming you add input_urls to GraphState
+        if input_urls:
+           st.subheader("User Provided URLs")
+           st.write(input_urls)
 
     # --- Tab 4: Analysis ---
     with tab_analysis:
         st.subheader("Analyst Output")
+        entities = getattr(state, 'extracted_entities', [])
+        relations = getattr(state, 'extracted_relations', [])
+
+        # show counts + raw triples
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Entities Extracted", len(state.extracted_entities or []))
-            if state.extracted_entities:
-                 with st.expander("View Entities"):
-                      st.write(state.extracted_entities)
-
+            st.metric("Entities Extracted", len(entities))
+            if entities:
+                with st.expander("View Entities"):
+                    st.write(entities)
         with col2:
-            st.metric("Relations Extracted", len(state.extracted_relations or []))
-            if state.extracted_relations:
-                 with st.expander("View Relations (Triples)"):
-                      st.json([rel.dict() for rel in state.extracted_relations]) # Display relations as JSON
+            st.metric("Relations Extracted", len(relations))
+            if relations:
+                with st.expander("View Relations (Triples)"):
+                    st.json([rel.model_dump() for rel in relations])
 
-        st.subheader("Simple Knowledge Graph")
-        if state.knowledge_graph:
-            # Pretty print the dictionary
-            st.json(state.knowledge_graph)
+        # --- Build a focused Knowledge Graph ---
+        st.subheader("📈 Knowledge Graph")
+        if not relations:
+            st.info("No relations to build graph.")
         else:
-            st.info("No knowledge graph generated.")
+            # 1) Identify main subject from "Who is X?"
+            raw_q = (state.query or "").strip()
+            main_subject = re.sub(r'(?i)^who\s+is\s+', '', raw_q).rstrip('?. ').strip()
+            if not main_subject:
+                st.info("Couldn't identify the main subject from the query.")
+            else:
+                def clean(node: str) -> str:
+                    return (
+                        node
+                        .replace('*','')                     # drop bullets
+                        .replace('(', '').replace(')', '')   # strip parentheses
+                        .strip()
+                        .replace('"','\\"')                  # escape quotes
+                    )
+
+                subj_clean = clean(main_subject)
+
+                # 2) Start DOT
+                dot = [
+                    "digraph KG {",
+                    "  rankdir=LR;",
+                    "  node [style=filled,fontname=\"Helvetica\"];",
+                    "",
+                    # central node
+                    f'  "{subj_clean}" [shape=oval, fillcolor=lightgoldenrod1, fontsize=12];',
+                    ""
+                ]
+
+                seen = set()
+                # 3) Add edges only for triples about our main subject
+                for rel in relations:
+                    # parse and clean
+                    s, p, o = rel.subject, rel.predicate, rel.object
+                    s_clean = clean(s)
+                    p_clean = clean(p)
+                    o_clean = clean(o)
+
+                    # skip boilerplate extractions
+                    if not (s_clean and p_clean and o_clean):
+                        continue
+                    # only include edges where subject matches our main subject
+                    if s_clean.lower() != subj_clean.lower():
+                        continue
+
+                    # declare object once
+                    if o_clean not in seen:
+                        dot.append(f'  "{o_clean}" [shape=box, fillcolor=whitesmoke, fontsize=10];')
+                        seen.add(o_clean)
+
+                    # add the edge
+                    dot.append(
+                        f'  "{subj_clean}" -> "{o_clean}" '
+                        f'[label="{p_clean}", fontcolor=gray40];'
+                    )
+
+                dot.append("}")
+
+                # 4) Render
+                dot_src = "\n".join(dot)
+                st.graphviz_chart(dot_src)
+
+                # optional: let power users see the DOT
+                with st.expander("View DOT source"):
+                    st.code(dot_src, language="dot")
 
     # --- Tab 5: Interaction ---
     with tab_interactive:
         st.subheader("Interactive Agent Output")
-        if state.clarification_questions:
+        clarifications = getattr(state, 'clarification_questions', [])
+        followups = getattr(state, 'suggested_followups', [])
+
+        if clarifications:
             st.markdown("**Suggested Clarification Questions:**")
-            for q in state.clarification_questions:
-                st.markdown(f"- {q}")
+            # Filter out potential empty strings or placeholder text from LLM output
+            filtered_clarifications = [q for q in clarifications if q and not q.startswith("Here are")]
+            if filtered_clarifications:
+                for q in filtered_clarifications:
+                    st.markdown(f"- {q}")
+            else:
+                 st.info("No specific clarification questions generated.")
         else:
             st.info("No clarification questions generated.")
 
         st.divider()
 
-        if state.suggested_followups:
+        if followups:
             st.markdown("**Suggested Follow-up Questions:**")
-            for q in state.suggested_followups:
-                st.markdown(f"- {q}")
+            # Filter out potential empty strings or placeholder text
+            filtered_followups = [q for q in followups if q and not q.startswith("Here are")]
+            if filtered_followups:
+                for q in filtered_followups:
+                    st.markdown(f"- {q}")
+            else:
+                st.info("No specific follow-up questions generated.")
         else:
             st.info("No follow-up questions generated.")
 
@@ -156,29 +291,26 @@ def display_state_details(state: GraphState):
         st.subheader("Agent Execution Flow")
         # This requires capturing the flow during graph.stream()
         if 'execution_flow' in st.session_state and st.session_state.execution_flow:
-            st.markdown(" -> ".join(st.session_state.execution_flow))
-            # Optionally display state changes at each step if captured
+            st.markdown(" -> ".join(f"`{node}`" for node in st.session_state.execution_flow))
+            # Optionally display state changes at each step if captured and stored
         else:
-            st.info("Execution flow tracking not implemented or graph run via invoke.")
+            st.info("Execution flow tracking not available or graph run via invoke.")
 
         # Placeholder for graph visualization
-        st.markdown("*(Graph visualization placeholder - Requires graphviz)*")
-        # try:
-        #     # Example: Generate and display the graph structure (static)
-        #     from graph.builder import build_graph
-        #     graph_viz = build_graph().get_graph()
-        #     st.graphviz_chart(graph_viz.draw_mermaid_png()) # Requires pygraphviz/pydot
-        # except Exception as viz_error:
-        #     st.warning(f"Could not render graph visualization: {viz_error}")
-
+        try:
+            st.subheader("📈 StateGraph DAG")
+            dot = get_graphviz_dot()
+            st.graphviz_chart(dot)
+        except Exception as viz_e:
+            st.warning(f"Could not generate graph visualization: {viz_e}")
 
 # --- Main Application Logic ---
 def main():
-    st.title("🧠 ActiveRAG Next - Multi-Agent Reasoning Demo")
+    st.title("ActiveRAG Next - Multi-Agent Reasoning Demo")
     st.markdown("""
-        Ask any question and see the multi-agent system retrieve information,
-        analyze it, reason through it, validate the results, and generate interactive suggestions.
-        Configure options in the sidebar.
+    Ask any question and see the multi-agent system retrieve information,
+    analyze it, reason through it, validate the results, and generate interactive suggestions.
+    Configure options in the sidebar.
     """)
 
     # --- Sidebar Configuration ---
@@ -191,27 +323,31 @@ def main():
         selected_llm = st.selectbox("Select LLM:", available_llms, index=0)
 
         # Web References Input
-        st.subheader("Add Web References")
+        st.subheader("Add Web References (Optional)")
         input_urls_str = st.text_area(
             "Enter URLs (one per line):",
             height=100,
             placeholder="e.g., https://example.com/article\nhttps://another-site.org/info"
+            # Need to modify the 'retrieve_docs' node to fetch and process these.
         )
         input_urls = [url.strip() for url in input_urls_str.split("\n") if url.strip()]
 
         # Document Set Selection (Placeholder)
-        st.subheader("Select Document Context")
+        st.subheader("Select Document Context (Placeholder)")
         # TODO: Implement logic to list and select available document sets/indices
-        st.info("Document set selection not yet implemented.")
+        st.info("Document set selection (VectorDB) is handled automatically by the retriever.")
         # selected_docs = st.multiselect("Use Documents:", ["Set A", "Set B"], default=["Set A"]) # Example
 
         st.divider()
-        run_button = st.button("🚀 Run ActiveRAG", use_container_width=True)
+        # run_button = st.button("Run ActiveRAG", use_container_width=True) # Button removed, using chat_input trigger
 
     # --- Main Area Logic ---
     # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    # Initialize execution flow tracking
+    if "execution_flow" not in st.session_state:
+        st.session_state.execution_flow = []
 
     # Display chat messages
     for message in st.session_state.messages:
@@ -226,53 +362,114 @@ def main():
             st.markdown(user_query)
 
         # Prepare arguments for the backend runner
-        # TODO: Modify run_rag or initial state creation to accept these configs
+        # Currently, the graph nodes are self-contained and use global settings.
         rag_config = {
-            "llm_provider": selected_llm, # Need to map this back to config values
-            "input_urls": input_urls,
-            # "selected_docs": selected_docs, # Pass selected docs if implemented
+            "llm_provider_ui_selection": selected_llm, # Pass selection if needed by backend
+            "input_urls": input_urls, # Pass URLs if retriever node uses them
         }
 
         # --- Run the Graph ---
         final_state = None
+        st.session_state.execution_flow = []  # Reset flow for new query
+
+        # accumulate partial outputs into one dict
+        state_updates = {"query": user_query}
+        current_execution_flow = []
+
         with st.chat_message("assistant"):
-            status = st.status("🚀 Running ActiveRAG Graph...", expanded=False)
-            with status:
+            with st.status("Running ActiveRAG Graph...", expanded=True) as status:
                 try:
-                    st.write("1. Initializing graph...")
-                    # ✨ FIX ✨
+                    status.write("1. Preparing input...")
+                    start_ts = time.time()
                     base_messages = convert_chat_to_base_messages(st.session_state.messages)
-                    final_state = asyncio.run(run_active_rag(
-                        query=user_query, chat_history=base_messages
-                    ))
-                    st.write("✅ Graph execution complete.")
-                    status.update(label="✅ Graph execution complete!", state="complete", expanded=False)
+
+                    async def run_stream():
+                        nonlocal state_updates, current_execution_flow
+                        async for node_name, node_output in stream_active_rag(
+                            query=user_query,
+                            chat_history=base_messages,
+                            input_urls=input_urls
+                        ):
+                            status.write(f"🔄 Executing `{node_name}`")
+                            serial = to_serializable(node_output)
+                            st.code(json.dumps(serial, indent=2))
+                            current_execution_flow.append(node_name)
+                            # merge each node’s outputs into our cumulative dict
+                            state_updates.update(serial)
+
+                    # run the async stream
+                    asyncio.run(run_stream())
+                    st.session_state.execution_flow = current_execution_flow
+
+                    if st.session_state.get("last_feedback"):
+                        state_updates["previous_feedback"] = st.session_state.last_feedback
+                        # Optional: clear after use
+                        st.session_state.last_feedback = None
+
+                    # build final GraphState from merged dict
+                    final_state = GraphState(**state_updates)
+                    elapsed = time.time() - start_ts
+                    status.success("✅ Graph execution complete!")
+                    status.write(f" Completed in **{elapsed:.2f}** seconds")
 
                 except Exception as e:
                     logger.exception(f"Error running ActiveRAG graph: {e}")
-                    st.error(f"An error occurred: {e}")
-                    status.update(label="❌ Error during execution", state="error", expanded=True)
+                    status.error(f"❌ Error during execution: {e}")
+                    final_state = None
 
+        # --- Display Results ---
+        if final_state:
+            display_state_details(final_state)
+            st.session_state.messages.append({
+                "role": "assistant",
+                "content": final_state.answer or "Sorry, I couldn't generate a response."
+            })
+        else:
+            error_message = "Sorry, an error occurred during processing."
+            st.error(error_message)
+            st.session_state.messages.append({"role": "assistant", "content": error_message})
 
-            # --- Display Results ---
-            if final_state:
-                 # Store execution flow if captured (requires stream modification)
-                 # st.session_state.execution_flow = capture_flow_from_stream(...)
-                 display_state_details(final_state)
+    # --- Feedback UI (Always visible if there's at least one assistant message) ---
+    if any(m["role"] == "assistant" for m in st.session_state.messages):
+        st.divider()
+        with st.expander("🔍 Your Feedback", expanded=False):
+            with st.form(key="feedback_form"):
+                rating = st.slider(
+                    "How would you rate this answer?",
+                    min_value=1,
+                    max_value=5,
+                    value=3,
+                    key="rating_slider"
+                )
+                comments = st.text_area(
+                    "Any comments or suggestions?",
+                    key="feedback_comments"
+                )
+                submitted = st.form_submit_button("Submit Feedback")
 
-                 # Add final answer to chat history
-                 assistant_response = final_state.answer if final_state.answer else "Sorry, I couldn't generate a response."
-                 st.session_state.messages.append({"role": "assistant", "content": assistant_response})
-                 # Rerun to update chat display NOT needed if elements are displayed outside chat message context
-
-            else:
-                 st.error("Failed to get results from the RAG process.")
-                 st.session_state.messages.append({"role": "assistant", "content": "Sorry, an error occurred."})
-
+                if submitted:
+                    st.session_state.last_feedback = {
+                        "rating": rating,
+                        "comments": comments.strip()
+                    }
+                    fb_msg = f"[Feedback: {rating} stars] {comments.strip()}"
+                    st.session_state.messages.append({
+                        "role": "system",
+                        "content": fb_msg
+                    })
+                    st.success("Thanks! Your feedback will help refine future answers.")
 
 if __name__ == "__main__":
-    # TODO: Ensure necessary environment variables (API keys) are set via .env
-    # Load environment variables (if using python-dotenv)
-    # from dotenv import load_dotenv
-    # load_dotenv()
+    try:
+        from dotenv import load_dotenv
+        # Load from .env file in the project root (adjust path if needed)
+        dotenv_path = os.path.join(project_root, '.env')
+        if os.path.exists(dotenv_path):
+            load_dotenv(dotenv_path=dotenv_path)
+            logger.info("Loaded environment variables from .env file.")
+        else:
+            logger.warning(".env file not found, relying on system environment variables.")
+    except ImportError:
+        logger.warning("'python-dotenv' not installed. Relying on system environment variables.")
+
     main()

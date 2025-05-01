@@ -1,3 +1,5 @@
+# graph/state.py
+
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from langchain_core.documents import Document
@@ -18,6 +20,7 @@ class GraphState(BaseModel):
     # --- Input ---
     query: str
     chat_history: Optional[List[BaseMessage]] = None
+    input_urls: List[str] = Field(default_factory=list)
 
     # --- Coordinator ---
     query_type: Optional[str] = None
@@ -42,11 +45,17 @@ class GraphState(BaseModel):
     is_valid: Optional[bool] = None
     validation_feedback: Optional[str] = None
     confidence_score: Optional[float] = None
+    retry_count: int = 0
 
     # --- Interactive / Final Output ---
     clarification_questions: List[str] = Field(default_factory=list)
     suggested_followups: List[str] = Field(default_factory=list)
     answer: Optional[str] = None
+
+    # --- Feedback---
+    previous_feedback: Optional[dict] = None
+    use_feedback: bool = False
+    clarification: Optional[str] = None
 
     class Config:
         arbitrary_types_allowed = True

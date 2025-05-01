@@ -1,10 +1,14 @@
 # utils/config.py
 
 from pydantic_settings import BaseSettings
-from typing import Optional
-from typing import List
+from typing import Optional, List
+from dotenv import load_dotenv  # NEW
+
+# Load environment variables first
+load_dotenv(override=True)  # <-- ADD THIS before initializing Settings()
 
 class Settings(BaseSettings):
+
     # LLM settings
     LLM_PROVIDER: str
     GROQ_API_KEY: str
@@ -25,7 +29,10 @@ class Settings(BaseSettings):
     OFFICE_DIRECTORY: str = "./office"
     WEB_URLS: List[str] = []
 
+    use_32k_context: bool = False
+
     class Config:
         env_file = ".env"
 
+# Initialize settings after dotenv is loaded
 settings = Settings()

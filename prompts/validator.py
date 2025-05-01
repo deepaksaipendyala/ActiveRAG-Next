@@ -1,30 +1,62 @@
 # prompts/validator.py
 
+from typing import List, Optional
+
 VALIDATOR_PROMPT = """
-You are an AI assistant tasked with validating the accuracy and coherence of a generated response based on the user's question and the retrieved passages.
+You are an AI assistant whose job is to check whether a generated answer is fully supported by the retrieved evidence.
 
 User's Question:
 {question}
 
-Generated Response:
+Retrieved Passages:
+{retrieved}
+
+Generated Answer:
 {generation}
 
-Instructions:
+{feedback_section}Instructions:
+- Only judge supportability against the *Retrieved Passages*.
+- If every factual claim in the answer is directly supported by at least one passage AND it fully addresses the question, respond with:
+  GOOD: <one‐sentence justification>
+- Otherwise (any hallucination, missing info, or contradiction), respond with:
+  BAD: <one‐sentence justification>
+- Do NOT include anything else.
 
-1. Carefully read the user's question and the generated response.
-2. Check if the response accurately addresses the user's question.
-3. Look for hallucinations or unsupported claims.
-4. Confirm if the answer is relevant, complete, and clear.
+Examples:
 
-Output:
-- If everything is correct, respond with "GOOD".
-- If there are issues, respond with "BAD".
+Question: Who wrote “Pride and Prejudice”?  
+Retrieved Passages:  
+1. “Pride and Prejudice” was written by Jane Austen in 1813.  
+Answer: “It was written by Jane Austen.”  
+→ GOOD: supported by passage 1.
 
-Respond strictly with GOOD or BAD first, optionally followed by a brief reason.
+Question: Who invented the telephone?  
+Retrieved Passages:  
+1. Alexander Graham Bell patented the first practical telephone in 1876.  
+Answer: “It was invented by Antonio Meucci.”  
+→ BAD: Antonio Meucci is not mentioned in the passages.
+
+Now evaluate:
 """
 
-def build_validation_prompt(question: str, generation: str) -> str:
+def build_validation_prompt(
+    question: str,
+    retrieved_contents: List[str],
+    generation: str,
+    feedback: Optional[str] = None
+) -> str:
     """
-    Build the Validator LLM prompt based on the original question and generated answer.
+    Build a clear Validator prompt including retrieved passages and optional user feedback.
     """
-    return VALIDATOR_PROMPT.format(question=question, generation=generation)
+    retrieved = "\n\n".join(retrieved_contents)
+    # Only include feedback section if we have feedback to consider.
+    if feedback:
+        feedback_section = f"User Feedback: {feedback}\n\n"
+    else:
+        feedback_section = ""
+    return VALIDATOR_PROMPT.format(
+        question=question,
+        retrieved=retrieved,
+        generation=generation,
+        feedback_section=feedback_section
+    )

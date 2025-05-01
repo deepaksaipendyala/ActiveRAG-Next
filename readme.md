@@ -35,11 +35,11 @@ graph TD;
 - Full DAG execution via **LangGraph**.
 - Conditional branching: dynamic reroutes based on validation / reasoning outcomes.
 - Supports iterative loops if validation fails.
-- Full traceability at every step. 📈
+- Full traceability at every step.
 
 ---
 
-## 🚀 Features
+##  Features
 
 - **Multi-Agent Intelligence**: Each step handled by specialized agents (Retriever, Reasoner, Validator, etc.)
 - **Streamlit App**: Interactive UI to visualize agent thoughts, validation, final answers.
@@ -51,7 +51,7 @@ graph TD;
 
 ---
 
-## 🛠️ Installation
+##  Installation
 
 ```bash
 git clone https://github.com/yourname/activerag-next.git
@@ -87,9 +87,7 @@ Watch the system **retrieve**, **analyze**, **reason**, **validate**, and **refi
 
 ---
 
-## 📈 Screenshots
-
-> (⚡ Tip: Add some actual screenshots here later for ✨ appeal)
+##  Screenshots
 
 | Home | Reasoning | Validation |
 |:---:|:---:|:---:|
@@ -97,7 +95,7 @@ Watch the system **retrieve**, **analyze**, **reason**, **validate**, and **refi
 
 ---
 
-## ⚙️ Configuration Options
+##  Configuration Options
 
 You can customize in the sidebar:
 
@@ -121,7 +119,7 @@ Unlike traditional RAGs, **ActiveRAG Next**:
 
 Because **truthfulness** matters.  
 Because **explainability** matters.  
-Because **AI shouldn't just "guess" — it should **show its work**. 📖
+Because **AI shouldn't just "guess" — it should **show its work**.
 
 ---
 
@@ -137,16 +135,16 @@ Because **AI shouldn't just "guess" — it should **show its work**. 📖
 
 ---
 
-## 📅 Roadmap (Next Updates)
+## Roadmap (Next Updates)
 
 - [x] Multi-Agent Reasoning Graph
 - [x] Real-time web augmentation
 - [x] Interactive UI (Streamlit)
 - [x] Knowledge graph generation
-- [ ] Graph visualization (dynamic DAG during execution) 🎯
-- [ ] Session saving (resume interrupted thought flows) 🧠
-- [ ] Fine-grained model control (temperature, top_p, system prompts) 🔥
-- [ ] LLM fallback strategies (resilience) 🛡️
+- [ ] Graph visualization (dynamic DAG during execution) 
+- [ ] Session saving (resume interrupted thought flows) 
+- [ ] Fine-grained model control (temperature, top_p, system prompts) 
+- [ ] LLM fallback strategies (resilience) 
 
 ---
 
@@ -155,23 +153,23 @@ Because **AI shouldn't just "guess" — it should **show its work**. 📖
 Pull requests are welcome! 🙌
 
 Please open an issue first if you want to propose major changes.  
-Let’s build the future of trustworthy AI reasoning — **together**. 🛠️
+Let’s build the future of trustworthy AI reasoning — **together**. 
 
 ---
 
-## 📄 License
+## License
 
-This project is licensed under the **MIT License** — free for personal, academic, or commercial use.
-
----
-
-## 💬 Credits
-
-Built with 💬, ☕, and way too much "let's make RAG systems actually intelligent" energy.  
-Created by [Your Name] — let's connect on [LinkedIn](https://linkedin.com/in/yourprofile)!
+This project is Unlicensed and under development!
 
 ---
 
-# 🚀 Let's Raise the Standard of RAGs Forever.
+## Credits
+
+Built with , ☕, and way too much "let's make RAG systems actually intelligent" energy.  
+Created by Deepak Sai Pendyala — let's connect on [LinkedIn](https://www.linkedin.com/in/deepaksaip)!
+
+---
+
+# Let's Raise the Standard of RAGs Forever.
 
 ---
