@@ -27,10 +27,10 @@ def get_llm():
     elif provider == "openai":
         # Switch to the 32 K context variant if requested
         if use_32k:
-            model_name = "gpt-4o-32k"
+            model_name = "gpt-4.1-mini-2025-04-14"
             max_toks = 32768
         else:
-            model_name = "gpt-4o"
+            model_name = "gpt-4.1-mini-2025-04-14"
             max_toks = 4096
 
         return ChatOpenAI(

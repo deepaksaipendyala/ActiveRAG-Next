@@ -185,72 +185,77 @@ def display_state_details(state: GraphState | None): # Allow None state
                     st.json([rel.model_dump() for rel in relations])
 
         # --- Build a focused Knowledge Graph ---
+        # --- Knowledge‑Graph ----------------------------------------------------------
         st.subheader("📈 Knowledge Graph")
+
         if not relations:
-            st.info("No relations to build graph.")
+            st.info("No relations found – nothing to draw.")
         else:
-            # 1) Identify main subject from "Who is X?"
             raw_q = (state.query or "").strip()
-            main_subject = re.sub(r'(?i)^who\s+is\s+', '', raw_q).rstrip('?. ').strip()
-            if not main_subject:
-                st.info("Couldn't identify the main subject from the query.")
+
+            # a. pattern‐based extraction from the user query
+            patterns = [
+                r'(?i)^\s*who\s+is\s+(.*)',
+                r'(?i)^\s*what\s+is\s+(.*)',
+                r'(?i)^\s*tell\s+me\s+about\s+(.*)',
+                r'(?i)^\s*give\s+me\s+information\s+about\s+(.*)',
+                r'(?i)^\s*explain\s+(?:the\s+)?(.*)',
+                r'(?i)^\s*describe\s+(.*)',
+            ]
+            centre = None
+            for pat in patterns:
+                m = re.match(pat, raw_q)
+                if m:
+                    centre = m.group(1).rstrip("?. ").strip()
+                    break
+
+            # b. fallback – most common subject in the triples
+            if not centre:
+                from collections import Counter
+                subj_counts = Counter(r.subject for r in relations if r.subject)
+                if subj_counts:
+                    centre, _ = subj_counts.most_common(1)[0]
+
+            if not centre:
+                st.info("Couldn’t guess a central entity.")
             else:
-                def clean(node: str) -> str:
-                    return (
-                        node
-                        .replace('*','')                     # drop bullets
-                        .replace('(', '').replace(')', '')   # strip parentheses
-                        .strip()
-                        .replace('"','\\"')                  # escape quotes
-                    )
+                # Optional UI – let the user switch to a different subject
+                unique_subjects = sorted({r.subject for r in relations})
+                chosen = st.selectbox("Focus node:", unique_subjects, index=unique_subjects.index(centre))
+                centre = chosen
 
-                subj_clean = clean(main_subject)
+                def clean(txt: str) -> str:
+                    return (txt.replace("*", "")
+                            .replace("(", "").replace(")", "")
+                            .replace('"', r'\"')
+                            .strip())
 
-                # 2) Start DOT
+                c_lbl = clean(centre)
+
                 dot = [
                     "digraph KG {",
                     "  rankdir=LR;",
-                    "  node [style=filled,fontname=\"Helvetica\"];",
-                    "",
-                    # central node
-                    f'  "{subj_clean}" [shape=oval, fillcolor=lightgoldenrod1, fontsize=12];',
-                    ""
+                    '  node [style=filled,fontname="Helvetica"];',
+                    f'  "{c_lbl}" [shape=oval, fillcolor=lightgoldenrod1, fontsize=12];',
                 ]
 
                 seen = set()
-                # 3) Add edges only for triples about our main subject
-                for rel in relations:
-                    # parse and clean
-                    s, p, o = rel.subject, rel.predicate, rel.object
-                    s_clean = clean(s)
-                    p_clean = clean(p)
-                    o_clean = clean(o)
+                for r in relations:
+                    if r.subject.lower() != centre.lower():
+                        continue                   # only edges out of the centre node
 
-                    # skip boilerplate extractions
-                    if not (s_clean and p_clean and o_clean):
-                        continue
-                    # only include edges where subject matches our main subject
-                    if s_clean.lower() != subj_clean.lower():
-                        continue
+                    s, p, o = clean(r.subject), clean(r.predicate), clean(r.object)
+                    if (s, p, o) in seen:
+                        continue                  # de‑duplicate
+                    seen.add((s, p, o))
 
-                    # declare object once
-                    if o_clean not in seen:
-                        dot.append(f'  "{o_clean}" [shape=box, fillcolor=whitesmoke, fontsize=10];')
-                        seen.add(o_clean)
-
-                    # add the edge
-                    dot.append(
-                        f'  "{subj_clean}" -> "{o_clean}" '
-                        f'[label="{p_clean}", fontcolor=gray40];'
-                    )
+                    dot.append(f'  "{o}" [shape=box, fillcolor=whitesmoke, fontsize=10];')
+                    dot.append(f'  "{s}" -> "{o}" [label="{p}", fontcolor=gray40];')
 
                 dot.append("}")
-
-                # 4) Render
                 dot_src = "\n".join(dot)
-                st.graphviz_chart(dot_src)
 
-                # optional: let power users see the DOT
+                st.graphviz_chart(dot_src)
                 with st.expander("View DOT source"):
                     st.code(dot_src, language="dot")
 
