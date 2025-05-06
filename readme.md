@@ -2,7 +2,7 @@
 
 Retrieval-Augmented Generation combined with multi-agent reasoning and validation for traceable, explainable, and interactive AI outputs.
 
----
+> This project is Version 2 of [ActiveRAG](https://github.com/deepaksaipendyala/ActiveRAG)
 
 Factual • Fast • Transparent • Interactive
 
