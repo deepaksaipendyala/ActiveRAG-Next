@@ -25,21 +25,8 @@ The system is designed for research, production-grade AI pipelines, and responsi
 
 ## Architecture
 
-```mermaid
-graph LR
-  subgraph Graph_of_Thought_LangGraph
-    A[Coordinator] -->|classify| B[Retriever]
-    B --> C[Analyst]
-    C --> D[Reasoner]
-    D --> E[Validator]
-    E -->|Valid| F[Interactive Agent]
-    E -->|Invalid| D
-    F -->|User Feedback| G[Feedback Handler]
-    G -->|Low Rating| D
-    G -->|High Rating| H[Finalizer]
-  end
+![Graph of Thought](img/graph.png)
 
-```
 * **Coordinator** – classifies query and selects the initial path.
 * **Retriever** – RAG‑Fusion version 2 supplies the top passages.
 * **Analyst** – extracts entities and relations in structured JSON.
