@@ -66,7 +66,7 @@ graph LR
 
 ---
 
-## Representative Queries
+## Representative Queries
 
 | Type        | Example                                                                            |
 | ----------- | ---------------------------------------------------------------------------------- |
@@ -79,7 +79,7 @@ Observe retrieval, analysis, reasoning, validation and feedback in real time.
 
 ---
 
-## Project Structure
+## Project Structure
 
 ```
 app/             Streamlit user interface
@@ -204,4 +204,3 @@ This project is currently unlicensed and under active development.
 
 **Deepak Sai Pendyala**
 LinkedIn: [linkedin.com/in/deepaksaip](https://www.linkedin.com/in/deepaksaip)
-GitHub: [github.com/deepaksaipendyala](https://github.com/deepaksaipendyala)
