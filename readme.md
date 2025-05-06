@@ -1,6 +1,9 @@
 # ActiveRAG Next: Multi-Agent Reasoning System
 
 Retrieval-Augmented Generation combined with multi-agent reasoning and validation for traceable, explainable, and interactive AI outputs.
+
+---
+
 Factual • Fast • Transparent • Interactive
 
 ---
