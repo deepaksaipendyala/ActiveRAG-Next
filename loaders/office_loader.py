@@ -64,5 +64,5 @@ def load_office_documents(directory: str) -> List[Document]:
 # --- Example usage (for quick testing) ---
 if __name__ == "__main__":
     test_dir = "./data/office_docs"
-    loaded_docs = load_office_docs(test_dir)
+    loaded_docs = load_office_documents(test_dir)
     print(f"Loaded {len(loaded_docs)} office documents.")
