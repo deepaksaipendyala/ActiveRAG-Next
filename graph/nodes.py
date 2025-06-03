@@ -269,7 +269,8 @@ def reason_through_docs(state: GraphState) -> Dict[str, Any]:
         # Rank and summarize top passages
         pairs = [[query, p] for p in passages]
         scores = cross_encoder.predict(pairs)
-        top_indices = sorted(range(len(scores)), key=lambda i: i, reverse=True)[:10]
+        # sort passages by cross-encoder score descending
+        top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:10]
         top_passages = [passages[i] for i in top_indices]
 
         summarized = summarize_passages(top_passages)
