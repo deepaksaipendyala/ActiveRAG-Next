@@ -1,11 +1,12 @@
 # utils/llm.py
 
 from langchain_openai import ChatOpenAI
+from langchain_community.chat_models import ChatOllama
 from utils.config import settings
 
 def get_llm():
     """
-    Dynamically select the LLM provider (Groq or OpenAI) based on the config settings.
+    Dynamically select the LLM provider (Groq, OpenAI, or Ollama) based on the config settings.
     Returns a LangChain-compatible LLM object, optionally with a 32 K context window.
     """
     provider = settings.LLM_PROVIDER.lower()
@@ -39,6 +40,14 @@ def get_llm():
             temperature=0.2,
             streaming=True,
             max_tokens=max_toks
+        )
+
+    elif provider == "ollama":
+        return ChatOllama(
+            base_url=settings.OLLAMA_BASE_URL,
+            model=settings.OLLAMA_MODEL,
+            temperature=0.2,
+            streaming=True
         )
 
     else:
