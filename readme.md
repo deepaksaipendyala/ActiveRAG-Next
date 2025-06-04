@@ -128,7 +128,7 @@ http://localhost:xxxx
 ## Example Use Cases
 
 * "What is Mercury?" - Provide the feedback if "you are referring to Planet or Element" - Ask the query again and check the response.
-* "How is Deepak Sai Pendyala?" - Provide my resume in resources.
+* "Who is Deepak Sai Pendyala?" - Provide my resume in resources.
 * "Compare Aristotle’s and Newton’s views on gravity."
 
 Each query is processed by a coordinated pipeline of specialized agents, producing validated, context-aware responses.
