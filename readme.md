@@ -56,6 +56,12 @@ The system is designed for research, production-grade AI pipelines, and responsi
 
 ---
 
+## Demo
+
+[![V2: ActiveRAG Next Demo](https://img.youtube.com/vi/z9dlMpAoplo/0.jpg)](https://www.youtube.com/watch?v=z9dlMpAoplo)
+
+---
+
 ## Representative Queries
 
 | Type        | Example                                                                            |
@@ -132,14 +138,6 @@ http://localhost:xxxx
 * "Compare Aristotle’s and Newton’s views on gravity."
 
 Each query is processed by a coordinated pipeline of specialized agents, producing validated, context-aware responses.
-
----
-
-## Screenshots
-
-| Home View                 | Reasoning Flow                 | Validation Output               |
-| ------------------------- | ------------------------------ | ------------------------------- |
-| ![](screenshots/home.png) | ![](screenshots/reasoning.png) | ![](screenshots/validation.png) |
 
 ---
 
