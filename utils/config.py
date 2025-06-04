@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str
     OPENAI_API_KEY: str
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "llama3.2b"
+    OLLAMA_MODEL: str = "llama3.2"
 
     # Embedding settings
     EMBEDDING_PROVIDER: str
