@@ -52,7 +52,7 @@ The system is designed for research, production-grade AI pipelines, and responsi
 * **Knowledge Graph Extraction**: Entities and relations rendered as a dynamic graph
 * **Reference Fusion**: Combines vectorstore retrieval with real-time web search
 * **User Interaction Layer**: Supports clarifications, feedback, and follow-up queries
-* **Dynamic Backend Selection**: Supports Groq (LLaMA 3), OpenAI (GPT-4), and Ollama for local inference
+* **Dynamic Backend Selection**: Supports Groq (LLaMA 3), OpenAI (GPT-4), and Ollama for local inference (e.g., Llama3.2b)
 
 ---
 
@@ -113,7 +113,7 @@ python3 -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate.bat on Windows
 pip install -r requirements.txt
 ```
-Set your provider keys in `.env` (`OPENAI_API_KEY`, `GROQ_API_KEY`) or export them in the shell.
+Set your provider keys in `.env` (`OPENAI_API_KEY`, `GROQ_API_KEY`) or set `LLM_PROVIDER=ollama` for local models. Customize `OLLAMA_BASE_URL` and `OLLAMA_MODEL` if needed.
 
 ---
 
