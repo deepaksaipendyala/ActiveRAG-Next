@@ -221,7 +221,13 @@ def display_state_details(state: GraphState | None): # Allow None state
             else:
                 # Optional UI – let the user switch to a different subject
                 unique_subjects = sorted({r.subject for r in relations})
-                chosen = st.selectbox("Focus node:", unique_subjects, index=unique_subjects.index(centre))
+
+                # Try to match centre in a case-insensitive way
+                match_index = next(
+                    (i for i, subj in enumerate(unique_subjects) if subj.lower() == centre.lower()),
+                    0  # fallback to first subject if no match
+                )
+                chosen = st.selectbox("Focus node:", unique_subjects, index=match_index)
                 centre = chosen
 
                 def clean(txt: str) -> str:
